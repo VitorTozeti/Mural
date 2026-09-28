@@ -1,16 +1,15 @@
 /**
- * Servidor do Mural (Cloudflare Pages Function em /data, ou Worker) — guarda o token do GitHub
- * em segredo e lê/grava o data.json.
+ * Servidor do Mural (Cloudflare Pages Function em /data) — guarda as notas num banco D1.
  *
- * Variáveis (Settings → Variables and Secrets):
- *   GITHUB_TOKEN     segredo  Fine-grained token com Contents: Read and write no REPO (obrigatório)
- *   REPO             texto    (opcional) padrão: VitorTozeti/Mural
- *   ALLOWED_ORIGINS  texto    (opcional) outros sites liberados além do próprio endereço
- *   MURAL_PASSWORD   segredo  (opcional) se existir, o site precisa da senha
- *   DATA_PATH        texto    (opcional) padrão: data.json
+ * Configuração no painel do Pages (Settings → Bindings):
+ *   D1 database  nome da variável: DB
+ * Opcional (Settings → Variables and Secrets):
+ *   ALLOWED_ORIGINS  outros sites liberados além do próprio endereço
+ *   MURAL_PASSWORD   se existir, o site precisa da senha
  */
 
-const GITHUB_API = 'https://api.github.com';
+const EMPTY = { version: 1, postits: [], links: [] };
+let tableReady = false;
 
 function requestOrigin(request) {
   const origin = request.headers.get('Origin');
@@ -23,6 +22,14 @@ function requestOrigin(request) {
   }
 }
 
+async function ensureTable(db) {
+  if (tableReady) return;
+  await db.prepare(
+    'CREATE TABLE IF NOT EXISTS mural (id INTEGER PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL)'
+  ).run();
+  tableReady = true;
+}
+
 export default {
   async fetch(request, env) {
     const origin = requestOrigin(request);
@@ -30,9 +37,8 @@ export default {
       new URL(request.url).origin,
       ...(env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
     ];
-    const repo = env.REPO || 'VitorTozeti/Mural';
     const cors = {
-      'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : (allowed[0] || ''),
+      'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : allowed[0],
       'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-Mural-Key',
       'Access-Control-Max-Age': '86400',
@@ -48,7 +54,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname !== '/data') return json({ error: 'not_found' }, 404);
 
-    if (!env.GITHUB_TOKEN) return json({ error: 'server_not_configured' }, 500);
+    if (!env.DB) return json({ error: 'server_not_configured', hint: 'ligue o banco D1 com o nome DB' }, 500);
     if (env.MURAL_PASSWORD) {
       if (!safeEqual(request.headers.get('X-Mural-Key') || '', env.MURAL_PASSWORD)) {
         return json({ error: 'unauthorized' }, 401);
@@ -57,24 +63,12 @@ export default {
       return json({ error: 'forbidden_origin' }, 403);
     }
 
-    const path = env.DATA_PATH || 'data.json';
-    const github = (method, body) => fetch(`${GITHUB_API}/repos/${repo}/contents/${path}`, {
-      method,
-      headers: {
-        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'mural-worker',
-        ...(body ? { 'Content-Type': 'application/json' } : {})
-      },
-      body: body ? JSON.stringify(body) : undefined
-    });
+    await ensureTable(env.DB);
 
     if (request.method === 'GET') {
-      const res = await github('GET');
-      if (!res.ok) return json({ error: 'github_error', status: res.status }, 502);
-      const file = await res.json();
-      const bytes = Uint8Array.from(atob(file.content.replace(/\n/g, '')), c => c.charCodeAt(0));
-      return json({ sha: file.sha, data: JSON.parse(new TextDecoder().decode(bytes)) });
+      const row = await env.DB.prepare('SELECT data, version FROM mural WHERE id = 1').first();
+      if (!row) return json({ sha: '0', data: EMPTY });
+      return json({ sha: String(row.version), data: JSON.parse(row.data) });
     }
 
     if (request.method === 'PUT') {
@@ -87,19 +81,22 @@ export default {
       const { data, sha } = payload || {};
       if (!data || !Array.isArray(data.postits)) return json({ error: 'invalid_data' }, 400);
 
-      const bytes = new TextEncoder().encode(JSON.stringify(data, null, 2));
-      let binary = '';
-      bytes.forEach(b => { binary += String.fromCharCode(b); });
+      const expected = Number(sha) || 0;
+      const text = JSON.stringify(data);
 
-      const res = await github('PUT', {
-        message: `Atualizar mural: ${new Date().toISOString()}`,
-        content: btoa(binary),
-        sha
-      });
-      if (res.status === 409 || res.status === 422) return json({ error: 'conflict' }, 409);
-      if (!res.ok) return json({ error: 'github_error', status: res.status }, 502);
-      const saved = await res.json();
-      return json({ sha: saved.content.sha });
+      if (expected === 0) {
+        const inserted = await env.DB.prepare(
+          'INSERT OR IGNORE INTO mural (id, data, version) VALUES (1, ?, 1)'
+        ).bind(text).run();
+        if (inserted.meta.changes === 1) return json({ sha: '1' });
+        return json({ error: 'conflict' }, 409);
+      }
+
+      const updated = await env.DB.prepare(
+        'UPDATE mural SET data = ?, version = version + 1 WHERE id = 1 AND version = ?'
+      ).bind(text, expected).run();
+      if (updated.meta.changes !== 1) return json({ error: 'conflict' }, 409);
+      return json({ sha: String(expected + 1) });
     }
 
     return json({ error: 'method_not_allowed' }, 405);
