@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mural de Post-its</title>
+  <!-- Google Fonts sugeridas no planejamento -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Indie+Flower&family=Kalam:wght@300;400;700&family=Patrick+Hand&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Cabeçalho / Barra de Ferramentas -->
+  <header id="top-bar">
+    <div class="logo">📌 <span>Nosso Mural</span></div>
+    <div class="actions">
+      <button id="btn-add-postit" class="btn btn-primary">+ Novo Post-it</button>
+      <button id="btn-config" class="btn btn-secondary" title="Configurações">⚙️ Configurações</button>
+      <button id="btn-sync" class="btn btn-secondary" title="Sincronizar">🔄 Sincronizar</button>
+    </div>
+  </header>
+
+  <!-- Container do Mural (fundo estilo cortiça/quadro) -->
+  <main id="board-container">
+    <div id="board">
+      <!-- Post-its renderizados via JS -->
+    </div>
+  </main>
+
+  <!-- Modal / Painel de Configurações (GitHub Token & Autor) -->
+  <div id="modal-config" class="modal hidden">
+    <div class="modal-content">
+      <h2>Configurações do Mural</h2>
+      <div class="form-group">
+        <label for="cfg-author">Quem é você?</label>
+        <select id="cfg-author">
+          <option value="eu">Eu</option>
+          <option value="ela">Ela</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="cfg-token">GitHub Personal Access Token (Fine-grained):</label>
+        <input type="password" id="cfg-token" placeholder="github_pat_...">
+        <small>Armazenado apenas no localStorage deste navegador.</small>
+      </div>
+      <div class="form-group">
+        <label for="cfg-repo">Repositório GitHub (owner/repo):</label>
+        <input type="text" id="cfg-repo" placeholder="usuario/repositorio">
+      </div>
+      <div class="modal-actions">
+        <button id="btn-save-config" class="btn btn-primary">Salvar</button>
+        <button id="btn-close-config" class="btn btn-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Criação / Edição de Post-it -->
+  <div id="modal-postit" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="modal-postit-title">Criar Post-it</h2>
+      <div class="form-group">
+        <label for="postit-text">Mensagem:</label>
+        <textarea id="postit-text" rows="4" placeholder="O que você quer conversar?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="postit-color">Cor:</label>
+          <div class="color-palette" id="color-palette">
+            <!-- Paleta de cores preenchida via JS ou botões -->
+            <button type="button" class="color-swatch selected" data-color="#FFF176" style="background:#FFF176;"></button>
+            <button type="button" class="color-swatch" data-color="#F48FB1" style="background:#F48FB1;"></button>
+            <button type="button" class="color-swatch" data-color="#90CAF9" style="background:#90CAF9;"></button>
+            <button type="button" class="color-swatch" data-color="#A5D6A7" style="background:#A5D6A7;"></button>
+            <button type="button" class="color-swatch" data-color="#FFCC80" style="background:#FFCC80;"></button>
+            <button type="button" class="color-swatch" data-color="#CE93D8" style="background:#CE93D8;"></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="postit-font">Fonte:</label>
+          <select id="postit-font">
+            <option value="Caveat">Caveat (Manuscrito)</option>
+            <option value="Patrick Hand">Patrick Hand</option>
+            <option value="Shadows Into Light">Shadows Into Light</option>
+            <option value="Indie Flower">Indie Flower</option>
+            <option value="Kalam">Kalam</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="postit-size">Tamanho:</label>
+          <select id="postit-size">
+            <option value="small">Pequeno</option>
+            <option value="medium" selected>Médio</option>
+            <option value="large">Grande</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="postit-emoji">Emoji:</label>
+          <input type="text" id="postit-emoji" placeholder="💬, ❤️, ✨" maxlength="4">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="postit-locked">
+          Post-it guardado 🔒 (criptografado com senha)
+        </label>
+      </div>
+      <div id="group-password" class="form-group hidden">
+        <label for="postit-password">Senha de desbloqueio:</label>
+        <input type="password" id="postit-password" placeholder="Defina a senha para revelar depois">
+        <small class="text-warning">⚠️ Não há recuperação de senha.</small>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-save-postit" class="btn btn-primary">Salvar Post-it</button>
+        <button id="btn-cancel-postit" class="btn btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/crypto.js"></script>
+  <script src="js/github.js"></script>
+  <script src="js/postit.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
