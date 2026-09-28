@@ -17,6 +17,11 @@ const BoardModule = {
     this.containerEl = boardEl.parentElement;
     this.callbacks = callbacks;
     this.pan = null;
+    this.pinch = null;
+    this.scale = 1;
+    this.minScale = 0.4;
+    this.maxScale = 2.5;
+    this.activePointers = new Map();
 
     window.addEventListener('pointermove', (e) => this.onPointerMove(e));
     window.addEventListener('pointerup', (e) => this.onPointerUp(e));
@@ -29,13 +34,32 @@ const BoardModule = {
     });
 
     if (this.containerEl) {
-      this.containerEl.addEventListener('pointerdown', (e) => this.startPan(e));
+      this.containerEl.addEventListener('pointerdown', (e) => this.onContainerPointerDown(e));
+      this.containerEl.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     }
+
+    this.zoomLabelEl = document.getElementById('btn-zoom-reset');
+    const zoomIn = document.getElementById('btn-zoom-in');
+    const zoomOut = document.getElementById('btn-zoom-out');
+    if (zoomIn) zoomIn.addEventListener('click', () => this.zoomTo(this.scale + 0.2));
+    if (zoomOut) zoomOut.addEventListener('click', () => this.zoomTo(this.scale - 0.2));
+    if (this.zoomLabelEl) this.zoomLabelEl.addEventListener('click', () => this.zoomTo(1));
+  },
+
+  onContainerPointerDown(e) {
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    if (this.activePointers.size >= 2) {
+      this.startPinch();
+      return;
+    }
+    this.startPan(e);
   },
 
   startPan(e) {
     if (e.button !== undefined && e.button !== 0) return;
-    if (this.drag || this.linkDrag) return;
+    if (this.drag || this.linkDrag || this.pinch) return;
     // Só inicia o pan se o clique começou em área vazia do mural (não num post-it,
     // botão, input ou outro elemento interativo).
     if (e.target.closest('.postit') || e.target.closest('.link-hit') ||
@@ -54,9 +78,69 @@ const BoardModule = {
     this.containerEl.classList.add('is-panning');
   },
 
+  startPinch() {
+    if (this.pan) {
+      this.containerEl.classList.remove('is-panning');
+      this.pan = null;
+    }
+    const pts = [...this.activePointers.values()];
+    if (pts.length < 2) return;
+    const [a, b] = pts;
+    const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    this.pinch = {
+      startDist: dist,
+      startScale: this.scale,
+      ...this.focalToContent(midX, midY)
+    };
+  },
+
+  focalToContent(clientX, clientY) {
+    const rect = this.containerEl.getBoundingClientRect();
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+    return {
+      contentX: (this.containerEl.scrollLeft + offsetX) / this.scale,
+      contentY: (this.containerEl.scrollTop + offsetY) / this.scale
+    };
+  },
+
+  clampScale(s) {
+    return Math.min(this.maxScale, Math.max(this.minScale, s));
+  },
+
+  applyZoom(newScale, clientX, clientY, contentX, contentY) {
+    this.scale = newScale;
+    this.boardEl.style.transform = `scale(${newScale})`;
+    const rect = this.containerEl.getBoundingClientRect();
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+    this.containerEl.scrollLeft = contentX * newScale - offsetX;
+    this.containerEl.scrollTop = contentY * newScale - offsetY;
+    if (this.zoomLabelEl) this.zoomLabelEl.textContent = `${Math.round(newScale * 100)}%`;
+  },
+
+  zoomTo(newScale) {
+    const rect = this.containerEl.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const midY = rect.top + rect.height / 2;
+    const focal = this.focalToContent(midX, midY);
+    this.applyZoom(this.clampScale(newScale), midX, midY, focal.contentX, focal.contentY);
+  },
+
+  onWheel(e) {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const focal = this.focalToContent(e.clientX, e.clientY);
+    const factor = Math.exp(-e.deltaY * 0.01);
+    const newScale = this.clampScale(this.scale * factor);
+    this.applyZoom(newScale, e.clientX, e.clientY, focal.contentX, focal.contentY);
+  },
+
   toBoardCoords(clientX, clientY) {
     const r = this.boardEl.getBoundingClientRect();
-    return { x: Math.round(clientX - r.left), y: Math.round(clientY - r.top) };
+    return { x: Math.round((clientX - r.left) / this.scale), y: Math.round((clientY - r.top) / this.scale) };
   },
 
   startDrag(e, element, postit) {
@@ -82,6 +166,21 @@ const BoardModule = {
   },
 
   onPointerMove(e) {
+    if (this.activePointers.has(e.pointerId)) {
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    if (this.pinch) {
+      const pts = [...this.activePointers.values()];
+      if (pts.length >= 2) {
+        const [a, b] = pts;
+        const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        const newScale = this.clampScale(this.pinch.startScale * (dist / this.pinch.startDist));
+        this.applyZoom(newScale, midX, midY, this.pinch.contentX, this.pinch.contentY);
+      }
+      return;
+    }
     if (this.pan) {
       const dx = e.clientX - this.pan.startX;
       const dy = e.clientY - this.pan.startY;
@@ -91,8 +190,8 @@ const BoardModule = {
       return;
     }
     if (this.drag) {
-      const dx = e.clientX - this.drag.startX;
-      const dy = e.clientY - this.drag.startY;
+      const dx = (e.clientX - this.drag.startX) / this.scale;
+      const dy = (e.clientY - this.drag.startY) / this.scale;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.drag.hasMoved = true;
       this.drag.element.style.left = `${Math.max(0, this.drag.initialLeft + dx)}px`;
       this.drag.element.style.top = `${Math.max(0, this.drag.initialTop + dy)}px`;
@@ -111,7 +210,12 @@ const BoardModule = {
     }
   },
 
-  onPointerUp() {
+  onPointerUp(e) {
+    if (e && this.activePointers.has(e.pointerId)) this.activePointers.delete(e.pointerId);
+    if (this.pinch) {
+      if (this.activePointers.size < 2) this.pinch = null;
+      return;
+    }
     if (this.pan) {
       this.containerEl.classList.remove('is-panning');
       this.pan = null;
