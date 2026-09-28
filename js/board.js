@@ -14,7 +14,9 @@ const BoardModule = {
 
   init(boardEl, callbacks) {
     this.boardEl = boardEl;
+    this.containerEl = boardEl.parentElement;
     this.callbacks = callbacks;
+    this.pan = null;
 
     window.addEventListener('pointermove', (e) => this.onPointerMove(e));
     window.addEventListener('pointerup', (e) => this.onPointerUp(e));
@@ -25,6 +27,31 @@ const BoardModule = {
       const { x, y } = this.toBoardCoords(e.clientX, e.clientY);
       callbacks.onBoardDoubleClick(x, y);
     });
+
+    if (this.containerEl) {
+      this.containerEl.addEventListener('pointerdown', (e) => this.startPan(e));
+    }
+  },
+
+  startPan(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (this.drag || this.linkDrag) return;
+    // Só inicia o pan se o clique começou em área vazia do mural (não num post-it,
+    // botão, input ou outro elemento interativo).
+    if (e.target.closest('.postit') || e.target.closest('.link-hit') ||
+        e.target.closest('button') || e.target.closest('input') ||
+        e.target.closest('select') || e.target.closest('textarea') ||
+        e.target.closest('#composer') || e.target.closest('.link-handle')) {
+      return;
+    }
+    this.pan = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startScrollLeft: this.containerEl.scrollLeft,
+      startScrollTop: this.containerEl.scrollTop,
+      moved: false
+    };
+    this.containerEl.classList.add('is-panning');
   },
 
   toBoardCoords(clientX, clientY) {
@@ -55,6 +82,14 @@ const BoardModule = {
   },
 
   onPointerMove(e) {
+    if (this.pan) {
+      const dx = e.clientX - this.pan.startX;
+      const dy = e.clientY - this.pan.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.pan.moved = true;
+      this.containerEl.scrollLeft = this.pan.startScrollLeft - dx;
+      this.containerEl.scrollTop = this.pan.startScrollTop - dy;
+      return;
+    }
     if (this.drag) {
       const dx = e.clientX - this.drag.startX;
       const dy = e.clientY - this.drag.startY;
@@ -77,6 +112,11 @@ const BoardModule = {
   },
 
   onPointerUp() {
+    if (this.pan) {
+      this.containerEl.classList.remove('is-panning');
+      this.pan = null;
+      return;
+    }
     if (this.drag) {
       const { element, id, hasMoved } = this.drag;
       element.classList.remove('is-dragging');

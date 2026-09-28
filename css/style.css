@@ -260,6 +260,15 @@ body[data-theme="custom"] { --ui-bg: #ffffff; --ui-text: #2c2c2c; --ui-muted: #6
   background-image: radial-gradient(var(--bg-dot-color) 1px, transparent 1px);
   background-size: 24px 24px;
   touch-action: none;
+  cursor: grab;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legado */
+}
+#board-container::-webkit-scrollbar {
+  display: none; /* Chrome/Edge/Safari */
+}
+#board-container.is-panning {
+  cursor: grabbing;
 }
 
 #board {
