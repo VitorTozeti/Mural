@@ -1,34 +1,34 @@
 :root {
   --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --shadow-postit: 2px 5px 12px rgba(0, 0, 0, 0.15);
-  --shadow-postit-drag: 6px 12px 24px rgba(0, 0, 0, 0.25);
-  --border-radius-postit: 3px;
+  --shadow-postit: 1px 3px 8px rgba(0, 0, 0, 0.1);
+  --shadow-postit-drag: 3px 8px 18px rgba(0, 0, 0, 0.18);
+  --border-radius-postit: 4px;
   --transition-fast: 0.15s ease;
 }
 
-/* Temas do Mural */
-body[data-theme="cortica"] {
-  --bg-board-color: #d2a679;
-  --bg-dot-color: #ab794b;
-  --ui-bg: #fffbf5;
-  --ui-text: #2c2523;
-  --ui-border: #e6dac8;
+/* Temas do Mural — sempre um quadro branco/claro, com uma opção escura */
+body[data-theme="claro"] {
+  --bg-board-color: #fafafa;
+  --bg-dot-color: #e5e5e5;
+  --ui-bg: #ffffff;
+  --ui-text: #2c2c2c;
+  --ui-border: #ececec;
 }
 
-body[data-theme="madeira"] {
-  --bg-board-color: #8c5836;
-  --bg-dot-color: #63391b;
-  --ui-bg: #f5ece4;
-  --ui-text: #2b1810;
-  --ui-border: #cbb4a3;
+body[data-theme="creme"] {
+  --bg-board-color: #faf7f2;
+  --bg-dot-color: #e9e2d6;
+  --ui-bg: #ffffff;
+  --ui-text: #2c2723;
+  --ui-border: #eee7db;
 }
 
 body[data-theme="escuro"] {
   --bg-board-color: #1e1e24;
-  --bg-dot-color: #33333d;
-  --ui-bg: #2b2b36;
+  --bg-dot-color: #303038;
+  --ui-bg: #26262e;
   --ui-text: #f0f0f5;
-  --ui-border: #3f3f4e;
+  --ui-border: #38383f;
 }
 
 * {
@@ -89,10 +89,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 18px;
+  padding: 10px 20px;
   background-color: var(--ui-bg);
   border-bottom: 1px solid var(--ui-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   z-index: 20;
   flex-wrap: wrap;
   gap: 10px;
@@ -222,17 +221,14 @@ body {
   background: rgba(0,0,0,0.06);
 }
 
-/* Canvas do Mural */
+/* Canvas do Mural — quadro branco liso, com um pontilhado bem sutil de referência */
 #board-container {
   flex: 1;
   position: relative;
   overflow: auto;
   background-color: var(--bg-board-color);
-  background-image: 
-    radial-gradient(var(--bg-dot-color) 12%, transparent 13%),
-    radial-gradient(var(--bg-dot-color) 12%, transparent 13%);
-  background-size: 32px 32px;
-  background-position: 0 0, 16px 16px;
+  background-image: radial-gradient(var(--bg-dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
   touch-action: none;
 }
 

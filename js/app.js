@@ -21,13 +21,13 @@ const App = {
   },
 
   initTheme() {
-    const savedTheme = localStorage.getItem('mural_theme') || 'cortica';
+    const savedTheme = localStorage.getItem('mural_theme') || 'claro';
     document.body.setAttribute('data-theme', savedTheme);
   },
 
   toggleTheme() {
-    const themes = ['cortica', 'madeira', 'escuro'];
-    const current = document.body.getAttribute('data-theme') || 'cortica';
+    const themes = ['claro', 'creme', 'escuro'];
+    const current = document.body.getAttribute('data-theme') || 'claro';
     const nextIndex = (themes.indexOf(current) + 1) % themes.length;
     const nextTheme = themes[nextIndex];
     document.body.setAttribute('data-theme', nextTheme);
