@@ -5,7 +5,7 @@
  *   REPO             texto   ex.: VitorTozeti/Mural
  *   ALLOWED_ORIGINS  texto   ex.: https://vitortozeti.github.io,http://localhost:8792
  *   GITHUB_TOKEN     segredo Fine-grained token com Contents: Read and write no REPO
- *   MURAL_PASSWORD   segredo senha que o site pede uma vez por aparelho
+ *   MURAL_PASSWORD   segredo (opcional) se existir, o site precisa da senha; sem ela, só o site em ALLOWED_ORIGINS acessa
  *   DATA_PATH        texto   (opcional) padrão: data.json
  */
 
@@ -33,8 +33,12 @@ export default {
     if (url.pathname !== '/data') return json({ error: 'not_found' }, 404);
 
     if (!env.GITHUB_TOKEN || !env.REPO) return json({ error: 'worker_not_configured' }, 500);
-    if (!env.MURAL_PASSWORD || !safeEqual(request.headers.get('X-Mural-Key') || '', env.MURAL_PASSWORD)) {
-      return json({ error: 'unauthorized' }, 401);
+    if (env.MURAL_PASSWORD) {
+      if (!safeEqual(request.headers.get('X-Mural-Key') || '', env.MURAL_PASSWORD)) {
+        return json({ error: 'unauthorized' }, 401);
+      }
+    } else if (!allowed.includes(origin)) {
+      return json({ error: 'forbidden_origin' }, 403);
     }
 
     const path = env.DATA_PATH || 'data.json';
