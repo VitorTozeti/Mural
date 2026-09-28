@@ -1,82 +1,46 @@
 /**
- * github.js - Leitura e escrita do data.json via GitHub REST API
+ * github.js - Lê e grava o data.json através do Cloudflare Worker (o token do GitHub fica só no Worker)
  */
+
+const WORKER_URL = '';
 
 const GitHubSync = {
   lastSha: null,
 
   getConfig() {
     return {
-      token: localStorage.getItem('mural_github_token') || '',
-      repo: localStorage.getItem('mural_github_repo') || '',
-      path: 'data.json'
+      url: (localStorage.getItem('mural_server_url') || WORKER_URL).trim().replace(/\/+$/, ''),
+      key: localStorage.getItem('mural_key') || ''
     };
+  },
+
+  async request(method, body) {
+    const { url, key } = this.getConfig();
+    const res = await fetch(`${url}/data`, {
+      method,
+      headers: {
+        'X-Mural-Key': key,
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
+    if (res.status === 409) throw new Error('CONFLICT_409');
+    if (!res.ok) throw new Error(`Erro no servidor do mural: ${res.status}`);
+    return res.json();
   },
 
   async loadData() {
-    const config = this.getConfig();
-    if (!config.token || !config.repo) {
-      console.warn("GitHub token ou repositório não configurados.");
-      return null;
-    }
-
-    const url = `https://api.github.com/repos/${config.repo}/contents/${config.path}`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${config.token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Erro ao buscar dados do GitHub: ${response.statusText}`);
-    }
-
-    const json = await response.json();
-    this.lastSha = json.sha;
-
-    // Decodifica conteúdo em base64 com suporte UTF-8
-    const content = decodeURIComponent(escape(window.atob(json.content)));
-    return JSON.parse(content);
+    if (!this.getConfig().url) return null;
+    const res = await this.request('GET');
+    this.lastSha = res.sha;
+    return res.data;
   },
 
   async saveData(dataObject) {
-    const config = this.getConfig();
-    if (!config.token || !config.repo) {
-      throw new Error("GitHub token ou repositório não configurados.");
-    }
-
-    const url = `https://api.github.com/repos/${config.repo}/contents/${config.path}`;
-    const contentStr = JSON.stringify(dataObject, null, 2);
-    const contentBase64 = window.btoa(unescape(encodeURIComponent(contentStr)));
-
-    const body = {
-      message: `Atualizar mural: ${new Date().toISOString()}`,
-      content: contentBase64,
-      sha: this.lastSha
-    };
-
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${config.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (response.status === 409) {
-      // Conflito: precisa reler e reaplicar
-      throw new Error("CONFLICT_409");
-    }
-
-    if (!response.ok) {
-      throw new Error(`Erro ao salvar no GitHub: ${response.statusText}`);
-    }
-
-    const resJson = await response.json();
-    this.lastSha = resJson.content.sha;
+    if (!this.getConfig().url) throw new Error('Servidor do mural não configurado.');
+    const res = await this.request('PUT', { data: dataObject, sha: this.lastSha });
+    this.lastSha = res.sha;
     return true;
   }
 };

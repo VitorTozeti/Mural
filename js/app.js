@@ -430,20 +430,6 @@ const App = {
   },
 
   async loadInitialData() {
-    this.setSyncState('syncing', 'Buscando...');
-    try {
-      const remoteData = await GitHubSync.loadData();
-      if (remoteData && remoteData.postits) {
-        this.data = this.normalize(remoteData);
-        localStorage.setItem('mural_local_data', JSON.stringify(this.data));
-        this.setSyncState('online', 'Sincronizado');
-        this.render();
-        return;
-      }
-    } catch (err) {
-      console.warn('GitHub offline ou não configurado:', err);
-    }
-
     const localSaved = localStorage.getItem('mural_local_data');
     if (localSaved) {
       try {
@@ -452,8 +438,13 @@ const App = {
         console.error('Erro local data:', e);
       }
     }
-    this.setSyncState('offline', 'Modo local');
     this.render();
+
+    if (!GitHubSync.getConfig().url) {
+      this.setSyncState('offline', 'Modo local');
+      return;
+    }
+    await this.manualSync();
   },
 
   async persistData() {
@@ -469,6 +460,8 @@ const App = {
       if (err.message === 'CONFLICT_409') {
         this.showToast('Edição simultânea detectada, sincronizando...', 'error');
         await this.manualSync();
+      } else if (err.message === 'UNAUTHORIZED') {
+        this.handleSyncError(err);
       } else {
         this.setSyncState('offline', 'Salvo localmente');
       }
@@ -478,8 +471,8 @@ const App = {
   openConfigModal() {
     const author = this.currentAuthor;
     document.getElementById('cfg-author').value = author;
-    document.getElementById('cfg-token').value = localStorage.getItem('mural_github_token') || '';
-    document.getElementById('cfg-repo').value = localStorage.getItem('mural_github_repo') || '';
+    document.getElementById('cfg-key').value = localStorage.getItem('mural_key') || '';
+    document.getElementById('cfg-server').value = GitHubSync.getConfig().url;
     const savedAuthorColor = PostItModule.authorColor(author);
     document.querySelectorAll('#author-color-palette .color-swatch-author').forEach(s => {
       s.classList.toggle('selected', s.dataset.authorColor === savedAuthorColor);
@@ -496,12 +489,42 @@ const App = {
     const selectedColor = document.querySelector('#author-color-palette .color-swatch-author.selected');
     if (selectedColor) localStorage.setItem(`author_color_${author}`, selectedColor.dataset.authorColor);
     localStorage.setItem('mural_author', author);
-    localStorage.setItem('mural_github_token', document.getElementById('cfg-token').value.trim());
-    localStorage.setItem('mural_github_repo', document.getElementById('cfg-repo').value.trim());
+    localStorage.setItem('mural_key', document.getElementById('cfg-key').value);
+    const server = document.getElementById('cfg-server').value.trim();
+    if (server && server !== WORKER_URL) localStorage.setItem('mural_server_url', server);
+    else localStorage.removeItem('mural_server_url');
     this.closeConfigModal();
     this.showToast('Configurações salvas!', 'success');
     this.render();
     this.manualSync();
+  },
+
+  async applyRemote(remoteData) {
+    const remote = this.normalize(remoteData);
+    const remoteEmpty = remote.postits.length === 0 && remote.links.length === 0;
+    if (remoteEmpty && this.data.postits.length > 0) {
+      await this.persistData();
+      this.showToast('Notas deste aparelho enviadas para o mural', 'success');
+      return;
+    }
+    this.data = remote;
+    localStorage.setItem('mural_local_data', JSON.stringify(this.data));
+    this.render();
+    this.setSyncState('online', 'Sincronizado');
+  },
+
+  handleSyncError(err) {
+    console.warn('Erro no sync:', err);
+    if (err.message === 'UNAUTHORIZED') {
+      this.setSyncState('offline', 'Senha incorreta');
+      if (!this.warnedAuth) {
+        this.warnedAuth = true;
+        this.showToast('Digite a senha do mural nas configurações', 'error');
+        this.openConfigModal();
+      }
+      return;
+    }
+    this.setSyncState('offline', 'Offline');
   },
 
   async manualSync() {
@@ -509,16 +532,13 @@ const App = {
     try {
       const remoteData = await GitHubSync.loadData();
       if (remoteData) {
-        this.data = this.normalize(remoteData);
-        localStorage.setItem('mural_local_data', JSON.stringify(this.data));
-        this.render();
-        this.setSyncState('online', 'Sincronizado');
+        this.warnedAuth = false;
+        await this.applyRemote(remoteData);
       } else {
         this.setSyncState('offline', 'Modo local');
       }
     } catch (e) {
-      console.warn('Erro no sync:', e);
-      this.setSyncState('offline', 'Offline');
+      this.handleSyncError(e);
     }
   },
 
