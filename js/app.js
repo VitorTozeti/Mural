@@ -17,7 +17,8 @@ const App = {
   composer: { editingId: null, x: 0, y: 0, color: '#FFF59D', size: 'medium' },
 
   get currentAuthor() {
-    return localStorage.getItem('mural_author') || 'eu';
+    const saved = localStorage.getItem('mural_author');
+    return saved === 'eu' ? 'eu' : 'kemily';
   },
 
   normalize(data) {
@@ -44,10 +45,8 @@ const App = {
   // ---------- Tema / paletas do mural ----------
 
   initTheme() {
-    const saved = localStorage.getItem('mural_theme');
-    this.applyTheme(THEMES.some(t => t.id === saved) ? saved : 'claro');
-
     const menu = document.getElementById('theme-menu');
+    const options = document.getElementById('theme-options');
     THEMES.forEach(t => {
       const item = document.createElement('button');
       item.className = 'theme-option';
@@ -62,11 +61,55 @@ const App = {
         this.applyTheme(t.id);
         menu.classList.add('hidden');
       });
-      menu.appendChild(item);
+      options.appendChild(item);
     });
+
+    const custom = this.getCustomTheme();
+    const inputs = {
+      board: document.getElementById('custom-board-color'),
+      dot: document.getElementById('custom-dot-color'),
+      link: document.getElementById('custom-link-color'),
+      noDots: document.getElementById('custom-no-dots')
+    };
+    inputs.board.value = custom.board;
+    inputs.dot.value = custom.dot;
+    inputs.link.value = custom.link;
+    inputs.noDots.checked = custom.noDots;
+    const onCustomChange = () => {
+      localStorage.setItem('mural_custom_theme', JSON.stringify({
+        board: inputs.board.value,
+        dot: inputs.dot.value,
+        link: inputs.link.value,
+        noDots: inputs.noDots.checked
+      }));
+      this.applyTheme('custom');
+    };
+    ['board', 'dot', 'link'].forEach(k => inputs[k].addEventListener('input', onCustomChange));
+    inputs.noDots.addEventListener('change', onCustomChange);
+
+    const saved = localStorage.getItem('mural_theme');
+    this.applyTheme(saved === 'custom' || THEMES.some(t => t.id === saved) ? saved : 'claro');
+  },
+
+  getCustomTheme() {
+    const defaults = { board: '#ffffff', dot: '#e3e3e3', link: '#94a3b8', noDots: false };
+    try {
+      return { ...defaults, ...JSON.parse(localStorage.getItem('mural_custom_theme') || '{}') };
+    } catch {
+      return defaults;
+    }
   },
 
   applyTheme(id) {
+    const style = document.body.style;
+    if (id === 'custom') {
+      const c = this.getCustomTheme();
+      style.setProperty('--bg-board-color', c.board);
+      style.setProperty('--bg-dot-color', c.noDots ? 'transparent' : c.dot);
+      style.setProperty('--link-color', c.link);
+    } else {
+      ['--bg-board-color', '--bg-dot-color', '--link-color'].forEach(v => style.removeProperty(v));
+    }
     document.body.setAttribute('data-theme', id);
     localStorage.setItem('mural_theme', id);
     document.querySelectorAll('.theme-option').forEach(o => o.classList.toggle('active', o.dataset.theme === id));
@@ -139,25 +182,69 @@ const App = {
 
   // ---------- Compositor (criar / editar no próprio mural) ----------
 
+  getCustomColors() {
+    try {
+      return JSON.parse(localStorage.getItem('mural_custom_colors') || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  saveCustomColors(colors) {
+    localStorage.setItem('mural_custom_colors', JSON.stringify(colors));
+  },
+
   buildComposerColors() {
     const wrap = document.getElementById('composer-colors');
-    PostItModule.palette.forEach(({ color, name }) => {
+    wrap.replaceChildren();
+    const presets = PostItModule.palette.map(p => ({ ...p, custom: false }));
+    const customs = this.getCustomColors().map(color => ({ color, name: 'Sua cor', custom: true }));
+
+    [...presets, ...customs].forEach(({ color, name, custom }) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'color-swatch';
+      b.className = 'color-swatch' + (custom ? ' is-custom' : '');
       b.dataset.color = color;
-      b.title = name;
+      b.title = custom ? `${color} — clique direito para remover` : name;
       b.style.background = color;
       b.addEventListener('click', () => this.setComposerColor(color));
+      if (custom) {
+        b.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.saveCustomColors(this.getCustomColors().filter(c => c !== color));
+          this.buildComposerColors();
+          this.setComposerColor(this.composer.color);
+        });
+      }
       wrap.appendChild(b);
     });
+
+    if (!this.customColorBound) {
+      this.customColorBound = true;
+      const picker = document.getElementById('composer-custom-color');
+      picker.addEventListener('input', () => this.setComposerColor(picker.value));
+      picker.addEventListener('change', () => {
+        const color = picker.value.toUpperCase();
+        const isPreset = PostItModule.palette.some(p => p.color.toUpperCase() === color);
+        const list = this.getCustomColors().filter(c => c !== color);
+        if (!isPreset) {
+          list.push(color);
+          this.saveCustomColors(list.slice(-12));
+          this.buildComposerColors();
+        }
+        this.setComposerColor(color);
+      });
+    }
   },
 
   setComposerColor(color) {
     this.composer.color = color;
-    document.getElementById('composer').style.backgroundColor = color;
+    const composer = document.getElementById('composer');
+    composer.style.backgroundColor = color;
+    composer.classList.toggle('is-dark', PostItModule.isDark(color));
+    document.getElementById('composer-custom-color').value = color.length === 7 ? color.toLowerCase() : '#fff59d';
     document.querySelectorAll('#composer-colors .color-swatch').forEach(s => {
-      s.classList.toggle('selected', s.dataset.color === color);
+      s.classList.toggle('selected', s.dataset.color.toUpperCase() === color.toUpperCase());
     });
   },
 

@@ -25,15 +25,24 @@ const PostItModule = {
     'resolvido': '✅ Resolvido'
   },
 
-  authorNames: { 'eu': 'Vitor', 'ela': 'Ela' },
+  authorNames: { 'eu': 'Vitor', 'kemily': 'Kemily', 'ela': 'Kemily' },
 
   authorColor(author) {
-    return localStorage.getItem(`author_color_${author}`) || (author === 'ela' ? '#EC4899' : '#2563EB');
+    return localStorage.getItem(`author_color_${author}`) || (author === 'eu' ? '#2563EB' : '#EC4899');
+  },
+
+  isDark(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140;
   },
 
   createPostItElement(postit, handlers, currentAuthor) {
     const el = document.createElement('div');
     el.className = `postit size-${postit.size || 'medium'}`;
+    if (this.isDark(postit.color)) el.classList.add('is-dark');
     if (postit.status === 'resolvido') el.classList.add('is-resolved');
     if (postit.secret) el.classList.add('is-secret');
     el.id = `postit-${postit.id}`;

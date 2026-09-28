@@ -194,12 +194,39 @@ button, input, select, textarea {
   border-radius: 12px;
   box-shadow: 0 10px 28px rgba(0,0,0,0.14);
   padding: 6px;
+  width: 240px;
+  z-index: 50;
+}
+.theme-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  width: 230px;
-  z-index: 50;
 }
+.theme-custom {
+  border-top: 1px solid var(--ui-border);
+  margin-top: 6px;
+  padding: 8px 6px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.theme-custom-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-muted);
+}
+.theme-custom label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.theme-custom .theme-custom-check { justify-content: flex-start; gap: 8px; }
+body[data-theme="custom"] { --ui-bg: #ffffff; --ui-text: #2c2c2c; --ui-muted: #6b7280; --ui-border: #ececec; --ui-hover: rgba(0,0,0,0.05); }
 .theme-option {
   display: flex;
   align-items: center;
@@ -504,20 +531,65 @@ body.is-linking, body.is-linking .postit { cursor: crosshair; }
 }
 .composer textarea:focus { outline: 2px solid rgba(0,0,0,0.2); }
 .composer-colors {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 .color-swatch {
-  aspect-ratio: 1;
-  width: 100%;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 1.5px solid rgba(0,0,0,0.15);
   cursor: pointer;
   transition: transform 0.1s;
 }
+.color-swatch.is-custom { border-radius: 5px; }
 .color-swatch:hover { transform: scale(1.15); }
 .color-swatch.selected { border: 2px solid #1f2328; transform: scale(1.15); }
+.composer.is-dark .color-swatch.selected { border-color: #fff; }
+
+.composer-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.custom-color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.45);
+  border-radius: 6px;
+  padding: 3px 8px 3px 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.custom-color-btn input[type="color"],
+.theme-custom input[type="color"] {
+  width: 26px;
+  height: 22px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Post-it em cor escura: texto claro */
+.postit.is-dark, .composer.is-dark { color: #f5f5f7; }
+.postit.is-dark .postit-header,
+.postit.is-dark .postit-status,
+.composer.is-dark .composer-tip,
+.composer.is-dark .seg button { color: rgba(255,255,255,0.75); }
+.postit.is-dark .postit-secret-tag { background: rgba(255,255,255,0.18); }
+.postit.is-dark.is-secret { outline-color: rgba(255,255,255,0.4); }
+.composer.is-dark textarea,
+.composer.is-dark select,
+.composer.is-dark .seg,
+.composer.is-dark .custom-color-btn { background: rgba(255,255,255,0.14); }
+.composer.is-dark .btn-ghost { color: rgba(255,255,255,0.8); }
+.composer.is-dark select option { color: #1f2328; }
+.composer.is-dark .secret-check input { accent-color: #fff; }
 
 .composer-row {
   display: flex;

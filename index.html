@@ -35,7 +35,16 @@
       <button id="btn-add-postit" class="btn btn-primary" title="Novo post-it (tecla N)">+ Post-it</button>
       <div class="theme-picker">
         <button id="btn-theme" class="btn btn-icon" title="Paleta do mural">🎨</button>
-        <div id="theme-menu" class="theme-menu hidden"></div>
+        <div id="theme-menu" class="theme-menu hidden">
+          <div id="theme-options" class="theme-options"></div>
+          <div class="theme-custom">
+            <div class="theme-custom-title">Personalizado</div>
+            <label>Fundo <input type="color" id="custom-board-color" value="#ffffff"></label>
+            <label>Pontinhos <input type="color" id="custom-dot-color" value="#e3e3e3"></label>
+            <label>Linhas <input type="color" id="custom-link-color" value="#94a3b8"></label>
+            <label class="theme-custom-check"><input type="checkbox" id="custom-no-dots"> Sem pontinhos</label>
+          </div>
+        </div>
       </div>
       <button id="btn-config" class="btn btn-icon" title="Configurações">⚙️</button>
       <button id="btn-sync" class="btn btn-icon" title="Sincronizar agora">🔄</button>
@@ -54,6 +63,13 @@
     <div id="composer" class="composer hidden">
       <textarea id="composer-text" rows="4" placeholder="Sobre o que você quer conversar?"></textarea>
       <div id="composer-colors" class="composer-colors"></div>
+      <div class="composer-custom">
+        <label class="custom-color-btn" title="Escolher qualquer cor">
+          <input type="color" id="composer-custom-color" value="#FFF59D">
+          <span>🎨 Outra cor</span>
+        </label>
+        <span class="composer-tip">Cores novas ficam salvas na paleta · clique direito remove</span>
+      </div>
       <div class="composer-row">
         <div id="composer-size" class="seg" role="group" aria-label="Tamanho">
           <button type="button" data-size="small" title="Pequeno">P</button>
@@ -89,8 +105,8 @@
         <div class="form-group">
           <label for="cfg-author">Quem está usando agora?</label>
           <select id="cfg-author">
+            <option value="kemily">Kemily</option>
             <option value="eu">Vitor</option>
-            <option value="ela">Ela</option>
           </select>
         </div>
         <div class="form-group">
