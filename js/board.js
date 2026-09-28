@@ -1,116 +1,163 @@
 /**
- * board.js - Gerenciamento do mural, drag-and-drop avançado com suporte a mouse e touch (mobile)
+ * board.js - Mural: arrastar post-its, conexões (linhas) entre post-its e duplo clique para criar
  */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const BoardModule = {
   boardEl: null,
-  activeDrag: null,
-  onPositionChange: null,
+  svgEl: null,
+  callbacks: {},
+  links: [],
+  drag: null,
+  linkDrag: null,
 
-  init(boardElement, onPositionChange) {
-    this.boardEl = boardElement;
-    this.onPositionChange = onPositionChange;
+  init(boardEl, callbacks) {
+    this.boardEl = boardEl;
+    this.callbacks = callbacks;
 
-    // Listeners globais de movimentação (Mouse)
-    window.addEventListener('mousemove', (e) => this.handlePointerMove(e.clientX, e.clientY));
-    window.addEventListener('mouseup', () => this.handlePointerEnd());
+    window.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    window.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    window.addEventListener('pointercancel', (e) => this.onPointerUp(e));
 
-    // Listeners globais de movimentação (Touch para celulares/tablets)
-    window.addEventListener('touchmove', (e) => {
-      if (this.activeDrag && e.touches.length > 0) {
-        e.preventDefault(); // Impede scroll indesejado ao arrastar post-it
-        this.handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-      }
-    }, { passive: false });
-
-    window.addEventListener('touchend', () => this.handlePointerEnd());
+    boardEl.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.postit') || e.target.closest('.link-hit')) return;
+      const { x, y } = this.toBoardCoords(e.clientX, e.clientY);
+      callbacks.onBoardDoubleClick(x, y);
+    });
   },
 
-  startDrag(e, element, postitData) {
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
+  toBoardCoords(clientX, clientY) {
+    const r = this.boardEl.getBoundingClientRect();
+    return { x: Math.round(clientX - r.left), y: Math.round(clientY - r.top) };
+  },
 
-    const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-
+  startDrag(e, element, postit) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target.closest('button') || e.target.closest('.link-handle')) return;
+    e.preventDefault();
     element.classList.add('is-dragging');
-
-    this.activeDrag = {
-      element: element,
-      id: postitData.id,
-      startX: clientX,
-      startY: clientY,
+    this.drag = {
+      element,
+      id: postit.id,
+      startX: e.clientX,
+      startY: e.clientY,
       initialLeft: parseInt(element.style.left, 10) || 0,
       initialTop: parseInt(element.style.top, 10) || 0,
       hasMoved: false
     };
   },
 
-  handlePointerMove(clientX, clientY) {
-    if (!this.activeDrag) return;
-
-    const dx = clientX - this.activeDrag.startX;
-    const dy = clientY - this.activeDrag.startY;
-
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-      this.activeDrag.hasMoved = true;
-    }
-
-    const newLeft = Math.max(0, this.activeDrag.initialLeft + dx);
-    const newTop = Math.max(0, this.activeDrag.initialTop + dy);
-
-    this.activeDrag.element.style.left = `${newLeft}px`;
-    this.activeDrag.element.style.top = `${newTop}px`;
+  startLink(e, fromId) {
+    this.linkDrag = { fromId, ...this.toBoardCoords(e.clientX, e.clientY), targetEl: null };
+    document.body.classList.add('is-linking');
+    this.drawLinks();
   },
 
-  handlePointerEnd() {
-    if (!this.activeDrag) return;
-
-    this.activeDrag.element.classList.remove('is-dragging');
-
-    if (this.activeDrag.hasMoved && this.onPositionChange) {
-      const finalX = parseInt(this.activeDrag.element.style.left, 10);
-      const finalY = parseInt(this.activeDrag.element.style.top, 10);
-      this.onPositionChange(this.activeDrag.id, finalX, finalY);
-    }
-
-    this.activeDrag = null;
-  },
-
-  renderBoard(postits, filterStatus, handlers) {
-    this.boardEl.innerHTML = '';
-
-    const filtered = postits.filter(p => {
-      if (!filterStatus || filterStatus === 'all') {
-        // Na visão geral "Todos", post-its resolvidos ficam escondidos no histórico
-        return p.status !== 'resolvido';
+  onPointerMove(e) {
+    if (this.drag) {
+      const dx = e.clientX - this.drag.startX;
+      const dy = e.clientY - this.drag.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.drag.hasMoved = true;
+      this.drag.element.style.left = `${Math.max(0, this.drag.initialLeft + dx)}px`;
+      this.drag.element.style.top = `${Math.max(0, this.drag.initialTop + dy)}px`;
+      this.drawLinks();
+    } else if (this.linkDrag) {
+      Object.assign(this.linkDrag, this.toBoardCoords(e.clientX, e.clientY));
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const target = under ? under.closest('.postit') : null;
+      const valid = target && target.dataset.id !== this.linkDrag.fromId ? target : null;
+      if (this.linkDrag.targetEl !== valid) {
+        if (this.linkDrag.targetEl) this.linkDrag.targetEl.classList.remove('link-target');
+        if (valid) valid.classList.add('link-target');
+        this.linkDrag.targetEl = valid;
       }
-      return p.status === filterStatus;
+      this.drawLinks();
+    }
+  },
+
+  onPointerUp() {
+    if (this.drag) {
+      const { element, id, hasMoved } = this.drag;
+      element.classList.remove('is-dragging');
+      this.drag = null;
+      if (hasMoved) {
+        this.callbacks.onMove(id, parseInt(element.style.left, 10), parseInt(element.style.top, 10));
+      }
+    } else if (this.linkDrag) {
+      const { fromId, targetEl } = this.linkDrag;
+      if (targetEl) targetEl.classList.remove('link-target');
+      this.linkDrag = null;
+      document.body.classList.remove('is-linking');
+      this.drawLinks();
+      if (targetEl) this.callbacks.onLink(fromId, targetEl.dataset.id);
+    }
+  },
+
+  center(el) {
+    return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 };
+  },
+
+  makeLine(a, b, cls) {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', a.x);
+    line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x);
+    line.setAttribute('y2', b.y);
+    line.setAttribute('class', cls);
+    return line;
+  },
+
+  drawLinks() {
+    if (!this.svgEl) return;
+    this.svgEl.replaceChildren();
+
+    this.links.forEach(link => {
+      const fromEl = document.getElementById(`postit-${link.from}`);
+      const toEl = document.getElementById(`postit-${link.to}`);
+      if (!fromEl || !toEl) return;
+      const a = this.center(fromEl);
+      const b = this.center(toEl);
+
+      const group = document.createElementNS(SVG_NS, 'g');
+      group.setAttribute('class', 'link');
+      const hit = this.makeLine(a, b, 'link-hit');
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = 'Clique para remover a conexão';
+      hit.appendChild(title);
+      hit.addEventListener('click', () => this.callbacks.onUnlink(link.id));
+      group.append(this.makeLine(a, b, 'link-line'), hit);
+      this.svgEl.appendChild(group);
     });
 
-    if (filtered.length === 0) {
-      const emptyNotice = document.createElement('div');
-      emptyNotice.style.position = 'absolute';
-      emptyNotice.style.left = '60px';
-      emptyNotice.style.top = '60px';
-      emptyNotice.style.fontSize = '1.2rem';
-      emptyNotice.style.color = 'rgba(0,0,0,0.5)';
-      emptyNotice.style.fontStyle = 'italic';
-      emptyNotice.innerHTML = '✨ Nenhum post-it nesta categoria. Clique em <strong>+ Novo Post-it</strong> para começar uma conversa!';
-      this.boardEl.appendChild(emptyNotice);
-      return;
+    if (this.linkDrag) {
+      const fromEl = document.getElementById(`postit-${this.linkDrag.fromId}`);
+      if (fromEl) {
+        const end = this.linkDrag.targetEl ? this.center(this.linkDrag.targetEl) : this.linkDrag;
+        this.svgEl.appendChild(this.makeLine(this.center(fromEl), end, 'link-line link-temp'));
+      }
     }
+  },
 
-    filtered.forEach(p => {
+  renderBoard(postits, links, handlers, currentAuthor) {
+    this.boardEl.replaceChildren();
+
+    this.svgEl = document.createElementNS(SVG_NS, 'svg');
+    this.svgEl.setAttribute('class', 'links-layer');
+    this.boardEl.appendChild(this.svgEl);
+
+    postits.forEach(p => {
       const el = PostItModule.createPostItElement(p, {
+        ...handlers,
         onDragStart: (e, element, data) => this.startDrag(e, element, data),
-        onEdit: handlers.onEdit,
-        onDelete: handlers.onDelete,
-        onUnlock: handlers.onUnlock,
-        onReaction: handlers.onReaction,
-        onToggleResolved: handlers.onToggleResolved
-      });
+        onLinkStart: (e, id) => this.startLink(e, id)
+      }, currentAuthor);
       this.boardEl.appendChild(el);
     });
+
+    const visible = new Set(postits.map(p => p.id));
+    this.links = links.filter(l => visible.has(l.from) && visible.has(l.to));
+    this.drawLinks();
   }
 };
 

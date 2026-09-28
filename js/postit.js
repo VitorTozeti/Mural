@@ -1,186 +1,136 @@
 /**
- * postit.js - Criação, formatação, reações e renderização dos post-its
+ * postit.js - Renderização dos post-its
  */
 
 const PostItModule = {
+  palette: [
+    { color: '#FFF59D', name: 'Amarelo' },
+    { color: '#FFCC80', name: 'Laranja' },
+    { color: '#FFCCBC', name: 'Pêssego' },
+    { color: '#F8BBD0', name: 'Rosa' },
+    { color: '#E1BEE7', name: 'Lilás' },
+    { color: '#D1C4E9', name: 'Lavanda' },
+    { color: '#BBDEFB', name: 'Azul' },
+    { color: '#B3E5FC', name: 'Céu' },
+    { color: '#B2EBF2', name: 'Água' },
+    { color: '#C8E6C9', name: 'Menta' },
+    { color: '#E6EE9C', name: 'Lima' },
+    { color: '#ECEFF1', name: 'Cinza' }
+  ],
+
   statusLabels: {
     'quero_falar': '💬 Quero falar',
     'conversando': '⏳ Em pauta',
     'preciso_tempo': '⏸️ Mais tempo',
-    'resolvido': '✨ Resolvido'
+    'resolvido': '✅ Resolvido'
   },
 
-  sensitivityLabels: {
-    'leve': '🌱 Leve',
-    'medio': '⚖️ Médio',
-    'seria': '💬 Séria'
+  authorNames: { 'eu': 'Vitor', 'ela': 'Ela' },
+
+  authorColor(author) {
+    return localStorage.getItem(`author_color_${author}`) || (author === 'ela' ? '#EC4899' : '#2563EB');
   },
 
-  authorColors: {
-    'eu': '#2563EB',
-    'ela': '#EC4899'
-  },
-
-  createPostItElement(postit, handlers) {
+  createPostItElement(postit, handlers, currentAuthor) {
     const el = document.createElement('div');
     el.className = `postit size-${postit.size || 'medium'}`;
+    if (postit.status === 'resolvido') el.classList.add('is-resolved');
+    if (postit.secret) el.classList.add('is-secret');
     el.id = `postit-${postit.id}`;
     el.dataset.id = postit.id;
-    
-    // Posição e rotação leve
     el.style.left = `${postit.x || 100}px`;
     el.style.top = `${postit.y || 100}px`;
     el.style.transform = `rotate(${postit.rotation || 0}deg)`;
     el.style.backgroundColor = postit.color || '#FFF59D';
-    el.style.fontFamily = postit.font ? `"${postit.font}", cursive` : 'Caveat, cursive';
 
-    // Determinar cor do autor
-    const authorColor = localStorage.getItem(`author_color_${postit.author}`) || 
-                        (postit.author === 'ela' ? '#EC4899' : '#2563EB');
-
-    // Header do Post-it
     const header = document.createElement('div');
     header.className = 'postit-header';
-    
-    const authorBadge = document.createElement('span');
-    authorBadge.className = 'postit-author-badge';
-    authorBadge.innerHTML = `
-      <span class="author-dot" style="background:${authorColor}"></span>
-      <span>${postit.author || 'eu'}</span>
-    `;
 
-    const badgesContainer = document.createElement('div');
-    badgesContainer.className = 'postit-badges';
+    const author = document.createElement('span');
+    author.className = 'postit-author';
+    const dot = document.createElement('span');
+    dot.className = 'author-dot';
+    dot.style.background = this.authorColor(postit.author);
+    const name = document.createElement('span');
+    name.textContent = this.authorNames[postit.author] || postit.author || '';
+    author.append(dot, name);
+    header.appendChild(author);
 
-    if (postit.emoji) {
-      const emojiSpan = document.createElement('span');
-      emojiSpan.innerText = postit.emoji;
-      badgesContainer.appendChild(emojiSpan);
+    if (postit.secret) {
+      const tag = document.createElement('span');
+      tag.className = 'postit-secret-tag';
+      tag.textContent = '🔒 só você vê';
+      header.appendChild(tag);
     }
 
-    if (postit.sensitivity) {
-      const sensBadge = document.createElement('span');
-      sensBadge.className = `badge-sensitivity sensitivity-${postit.sensitivity}`;
-      sensBadge.innerText = this.sensitivityLabels[postit.sensitivity] || postit.sensitivity;
-      badgesContainer.appendChild(sensBadge);
-    }
-
-    header.appendChild(authorBadge);
-    header.appendChild(badgesContainer);
-
-    // Body do Post-it
     const body = document.createElement('div');
     body.className = 'postit-body';
+    body.textContent = postit.text || '';
 
-    if (postit.locked) {
-      const hintHtml = postit.hint ? `<div style="font-size:0.85rem; font-style:italic; margin-top:6px; opacity:0.85;">"${postit.hint}"</div>` : '';
-      body.innerHTML = `
-        <div style="text-align:center; padding: 18px 0;">
-          <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));">🔒</div>
-          <div style="font-weight: 600; margin-top: 6px;">Post-it guardado</div>
-          ${hintHtml}
-          <button class="btn btn-secondary btn-unlock" style="margin-top: 12px; font-size: 0.8rem; padding: 4px 10px;">Revelar</button>
-        </div>
-      `;
-      const btnUnlock = body.querySelector('.btn-unlock');
-      btnUnlock.addEventListener('click', (e) => {
-        e.stopPropagation();
-        handlers.onUnlock(postit);
-      });
-    } else {
-      body.innerText = postit.text || '';
-    }
+    const footer = document.createElement('div');
+    footer.className = 'postit-footer';
 
-    // Reações rápidas (❤️, 👀, 😅)
-    const reactionsRow = document.createElement('div');
-    reactionsRow.className = 'postit-reactions-row';
-    const reactionList = ['❤️', '👀', '😅'];
+    const status = document.createElement('span');
+    status.className = 'postit-status';
+    status.textContent = this.statusLabels[postit.status || 'quero_falar'];
+
+    const reactions = document.createElement('div');
+    reactions.className = 'postit-reactions';
     const postitReactions = postit.reactions || {};
-
-    reactionList.forEach(emoji => {
+    ['❤️', '👀', '😅'].forEach(emoji => {
+      const who = postitReactions[emoji] || [];
       const btn = document.createElement('button');
       btn.className = 'btn-react';
-      const count = (postitReactions[emoji] || []).length;
-      btn.innerHTML = `${emoji} <span class="react-count">${count > 0 ? count : ''}</span>`;
-      
-      const currentAuthor = localStorage.getItem('mural_author') || 'eu';
-      if ((postitReactions[emoji] || []).includes(currentAuthor)) {
-        btn.classList.add('active');
-      }
-
+      if (who.includes(currentAuthor)) btn.classList.add('active');
+      if (who.length === 0) btn.classList.add('empty');
+      btn.textContent = who.length ? `${emoji} ${who.length}` : emoji;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         handlers.onReaction(postit.id, emoji);
       });
-
-      reactionsRow.appendChild(btn);
+      reactions.appendChild(btn);
     });
 
-    // Rodapé / Status e Ações Rápidas
-    const footer = document.createElement('div');
-    footer.className = 'postit-footer';
-    
-    const statusTag = document.createElement('span');
-    statusTag.className = 'postit-status-tag';
-    statusTag.innerText = this.statusLabels[postit.status || 'quero_falar'];
+    footer.append(status, reactions);
 
-    const quickActions = document.createElement('div');
-    quickActions.className = 'postit-quick-actions';
+    const actions = document.createElement('div');
+    actions.className = 'postit-actions';
+    const mkAction = (icon, title, fn) => {
+      const b = document.createElement('button');
+      b.className = 'btn-action-mini';
+      b.title = title;
+      b.textContent = icon;
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+      return b;
+    };
+    actions.append(
+      mkAction(postit.status === 'resolvido' ? '↩️' : '✅',
+        postit.status === 'resolvido' ? 'Reabrir' : 'Marcar como resolvido',
+        () => handlers.onToggleResolved(postit.id)),
+      mkAction('✏️', 'Editar', () => handlers.onEdit(postit)),
+      mkAction('🗑️', 'Excluir', () => handlers.onDelete(postit.id))
+    );
 
-    // Botão de alternar status rápido (para resolvido ou em pauta)
-    const btnQuickStatus = document.createElement('button');
-    btnQuickStatus.className = 'btn-action-mini';
-    btnQuickStatus.title = postit.status === 'resolvido' ? 'Reabrir post-it' : 'Marcar como resolvido';
-    btnQuickStatus.innerText = postit.status === 'resolvido' ? '↩️' : '✅';
-    btnQuickStatus.addEventListener('click', (e) => {
+    const handle = document.createElement('div');
+    handle.className = 'link-handle';
+    handle.title = 'Arraste até outro post-it para conectar';
+    handle.textContent = '+';
+    handle.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
-      handlers.onToggleResolved(postit.id);
+      e.preventDefault();
+      handlers.onLinkStart(e, postit.id);
     });
 
-    // Botão editar
-    const btnEdit = document.createElement('button');
-    btnEdit.className = 'btn-action-mini';
-    btnEdit.title = 'Editar';
-    btnEdit.innerText = '✏️';
-    btnEdit.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handlers.onEdit(postit);
-    });
+    el.append(actions, header, body, footer, handle);
 
-    // Botão excluir
-    const btnDelete = document.createElement('button');
-    btnDelete.className = 'btn-action-mini';
-    btnDelete.title = 'Excluir';
-    btnDelete.innerText = '🗑️';
-    btnDelete.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handlers.onDelete(postit.id);
-    });
-
-    quickActions.appendChild(btnQuickStatus);
-    quickActions.appendChild(btnEdit);
-    quickActions.appendChild(btnDelete);
-
-    footer.appendChild(statusTag);
-    footer.appendChild(quickActions);
-
-    el.appendChild(header);
-    el.appendChild(body);
-    if (!postit.locked) {
-      el.appendChild(reactionsRow);
-    }
-    el.appendChild(footer);
-
-    // Eventos de arrastar e duplo clique para editar
-    el.addEventListener('mousedown', (e) => handlers.onDragStart(e, el, postit));
-    el.addEventListener('touchstart', (e) => handlers.onDragStart(e, el, postit), { passive: false });
-    el.addEventListener('dblclick', () => handlers.onEdit(postit));
+    el.addEventListener('pointerdown', (e) => handlers.onDragStart(e, el, postit));
+    el.addEventListener('dblclick', (e) => { e.stopPropagation(); handlers.onEdit(postit); });
 
     return el;
   },
 
-  generateId() {
-    return 'p_' + Math.random().toString(36).substring(2, 9);
+  generateId(prefix = 'p') {
+    return `${prefix}_` + Math.random().toString(36).substring(2, 9);
   }
 };
 
