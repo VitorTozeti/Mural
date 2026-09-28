@@ -2,7 +2,7 @@
  * github.js - Lê e grava o data.json através do Cloudflare Worker (o token do GitHub fica só no Worker)
  */
 
-const WORKER_URL = '';
+const WORKER_URL = 'https://muralzinho.pages.dev';
 
 const GitHubSync = {
   lastSha: null,

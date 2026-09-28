@@ -1,20 +1,36 @@
 /**
- * Cloudflare Worker do Mural — guarda o token do GitHub em segredo e lê/grava o data.json.
+ * Servidor do Mural (Cloudflare Pages Function em /data, ou Worker) — guarda o token do GitHub
+ * em segredo e lê/grava o data.json.
  *
  * Variáveis (Settings → Variables and Secrets):
- *   REPO             texto   ex.: VitorTozeti/Mural
- *   ALLOWED_ORIGINS  texto   ex.: https://vitortozeti.github.io,http://localhost:8792
- *   GITHUB_TOKEN     segredo Fine-grained token com Contents: Read and write no REPO
- *   MURAL_PASSWORD   segredo (opcional) se existir, o site precisa da senha; sem ela, só o site em ALLOWED_ORIGINS acessa
- *   DATA_PATH        texto   (opcional) padrão: data.json
+ *   GITHUB_TOKEN     segredo  Fine-grained token com Contents: Read and write no REPO (obrigatório)
+ *   REPO             texto    (opcional) padrão: VitorTozeti/Mural
+ *   ALLOWED_ORIGINS  texto    (opcional) outros sites liberados além do próprio endereço
+ *   MURAL_PASSWORD   segredo  (opcional) se existir, o site precisa da senha
+ *   DATA_PATH        texto    (opcional) padrão: data.json
  */
 
 const GITHUB_API = 'https://api.github.com';
 
+function requestOrigin(request) {
+  const origin = request.headers.get('Origin');
+  if (origin) return origin;
+  const referer = request.headers.get('Referer');
+  try {
+    return referer ? new URL(referer).origin : '';
+  } catch {
+    return '';
+  }
+}
+
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get('Origin') || '';
-    const allowed = (env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const origin = requestOrigin(request);
+    const allowed = [
+      new URL(request.url).origin,
+      ...(env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+    ];
+    const repo = env.REPO || 'VitorTozeti/Mural';
     const cors = {
       'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : (allowed[0] || ''),
       'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
@@ -32,7 +48,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname !== '/data') return json({ error: 'not_found' }, 404);
 
-    if (!env.GITHUB_TOKEN || !env.REPO) return json({ error: 'worker_not_configured' }, 500);
+    if (!env.GITHUB_TOKEN) return json({ error: 'server_not_configured' }, 500);
     if (env.MURAL_PASSWORD) {
       if (!safeEqual(request.headers.get('X-Mural-Key') || '', env.MURAL_PASSWORD)) {
         return json({ error: 'unauthorized' }, 401);
@@ -42,7 +58,7 @@ export default {
     }
 
     const path = env.DATA_PATH || 'data.json';
-    const github = (method, body) => fetch(`${GITHUB_API}/repos/${env.REPO}/contents/${path}`, {
+    const github = (method, body) => fetch(`${GITHUB_API}/repos/${repo}/contents/${path}`, {
       method,
       headers: {
         'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
