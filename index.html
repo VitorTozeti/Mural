@@ -2,124 +2,244 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Mural de Post-its</title>
-  <!-- Google Fonts sugeridas no planejamento -->
+  
+  <!-- Fontes manuscritas e amigáveis do Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Indie+Flower&family=Kalam:wght@300;400;700&family=Patrick+Hand&family=Shadows+Into+Light&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <!-- Cabeçalho / Barra de Ferramentas -->
+<body data-theme="cortica">
+
+  <!-- Barra de Notificações / Status Offline / Conflito -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Cabeçalho / Barra de Ferramentas Principal -->
   <header id="top-bar">
-    <div class="logo">📌 <span>Nosso Mural</span></div>
+    <div class="logo-area">
+      <span class="logo-icon">📌</span>
+      <h1 class="logo-title">Nosso Mural</h1>
+      <span id="sync-status-indicator" class="sync-pill online" title="Status de sincronização">
+        <span class="dot"></span> <span class="sync-text">Pronto</span>
+      </span>
+    </div>
+
+    <!-- Filtros de Status rápidos -->
+    <div class="filter-bar">
+      <button class="filter-chip active" data-filter="all">Todos</button>
+      <button class="filter-chip" data-filter="quero_falar">💬 Quero falar</button>
+      <button class="filter-chip" data-filter="conversando">⏳ Em pauta</button>
+      <button class="filter-chip" data-filter="resolvido">✨ Resolvidos</button>
+    </div>
+
     <div class="actions">
       <button id="btn-add-postit" class="btn btn-primary">+ Novo Post-it</button>
-      <button id="btn-config" class="btn btn-secondary" title="Configurações">⚙️ Configurações</button>
-      <button id="btn-sync" class="btn btn-secondary" title="Sincronizar">🔄 Sincronizar</button>
+      <button id="btn-history" class="btn btn-secondary" title="Histórico de post-its resolvidos">📜 Histórico</button>
+      <button id="btn-theme-toggle" class="btn btn-icon" title="Mudar tema do mural">🎨</button>
+      <button id="btn-config" class="btn btn-icon" title="Configurações e Token">⚙️</button>
+      <button id="btn-sync" class="btn btn-icon" title="Sincronizar agora">🔄</button>
     </div>
   </header>
 
-  <!-- Container do Mural (fundo estilo cortiça/quadro) -->
+  <!-- Container do Mural (fundo estilo cortiça/quadro/madeira) -->
   <main id="board-container">
     <div id="board">
       <!-- Post-its renderizados via JS -->
     </div>
   </main>
 
-  <!-- Modal / Painel de Configurações (GitHub Token & Autor) -->
-  <div id="modal-config" class="modal hidden">
-    <div class="modal-content">
-      <h2>Configurações do Mural</h2>
-      <div class="form-group">
-        <label for="cfg-author">Quem é você?</label>
-        <select id="cfg-author">
-          <option value="eu">Eu</option>
-          <option value="ela">Ela</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="cfg-token">GitHub Personal Access Token (Fine-grained):</label>
-        <input type="password" id="cfg-token" placeholder="github_pat_...">
-        <small>Armazenado apenas no localStorage deste navegador.</small>
-      </div>
-      <div class="form-group">
-        <label for="cfg-repo">Repositório GitHub (owner/repo):</label>
-        <input type="text" id="cfg-repo" placeholder="usuario/repositorio">
-      </div>
-      <div class="modal-actions">
-        <button id="btn-save-config" class="btn btn-primary">Salvar</button>
-        <button id="btn-close-config" class="btn btn-secondary">Fechar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal de Criação / Edição de Post-it -->
   <div id="modal-postit" class="modal hidden">
     <div class="modal-content">
-      <h2 id="modal-postit-title">Criar Post-it</h2>
-      <div class="form-group">
-        <label for="postit-text">Mensagem:</label>
-        <textarea id="postit-text" rows="4" placeholder="O que você quer conversar?"></textarea>
+      <div class="modal-header">
+        <h2 id="modal-postit-title">Criar Post-it</h2>
+        <button class="btn-close" id="btn-close-postit-modal">&times;</button>
       </div>
-      <div class="form-row">
+
+      <div class="modal-body">
         <div class="form-group">
-          <label for="postit-color">Cor:</label>
-          <div class="color-palette" id="color-palette">
-            <!-- Paleta de cores preenchida via JS ou botões -->
-            <button type="button" class="color-swatch selected" data-color="#FFF176" style="background:#FFF176;"></button>
-            <button type="button" class="color-swatch" data-color="#F48FB1" style="background:#F48FB1;"></button>
-            <button type="button" class="color-swatch" data-color="#90CAF9" style="background:#90CAF9;"></button>
-            <button type="button" class="color-swatch" data-color="#A5D6A7" style="background:#A5D6A7;"></button>
-            <button type="button" class="color-swatch" data-color="#FFCC80" style="background:#FFCC80;"></button>
-            <button type="button" class="color-swatch" data-color="#CE93D8" style="background:#CE93D8;"></button>
+          <label for="postit-text">Assunto / Mensagem:</label>
+          <textarea id="postit-text" rows="4" placeholder="O que você gostaria de conversar?"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cor:</label>
+            <div class="color-palette" id="color-palette">
+              <button type="button" class="color-swatch selected" data-color="#FFF59D" title="Amarelo clássico" style="background:#FFF59D;"></button>
+              <button type="button" class="color-swatch" data-color="#F8BBD0" title="Rosa pastel" style="background:#F8BBD0;"></button>
+              <button type="button" class="color-swatch" data-color="#BBDEFB" title="Azul suave" style="background:#BBDEFB;"></button>
+              <button type="button" class="color-swatch" data-color="#C8E6C9" title="Verde menta" style="background:#C8E6C9;"></button>
+              <button type="button" class="color-swatch" data-color="#FFE0B2" title="Laranja pêssego" style="background:#FFE0B2;"></button>
+              <button type="button" class="color-swatch" data-color="#E1BEE7" title="Lilás doce" style="background:#E1BEE7;"></button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="postit-font">Estilo de Fonte:</label>
+            <select id="postit-font">
+              <option value="Caveat">Caveat (Manuscrito fluído)</option>
+              <option value="Patrick Hand">Patrick Hand (Giz/Caderno)</option>
+              <option value="Shadows Into Light">Shadows Into Light</option>
+              <option value="Indie Flower">Indie Flower</option>
+              <option value="Kalam">Kalam</option>
+            </select>
           </div>
         </div>
-        <div class="form-group">
-          <label for="postit-font">Fonte:</label>
-          <select id="postit-font">
-            <option value="Caveat">Caveat (Manuscrito)</option>
-            <option value="Patrick Hand">Patrick Hand</option>
-            <option value="Shadows Into Light">Shadows Into Light</option>
-            <option value="Indie Flower">Indie Flower</option>
-            <option value="Kalam">Kalam</option>
-          </select>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="postit-size">Tamanho:</label>
+            <select id="postit-size">
+              <option value="small">Pequeno</option>
+              <option value="medium" selected>Médio</option>
+              <option value="large">Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="postit-emoji">Emoji:</label>
+            <input type="text" id="postit-emoji" placeholder="💬, ❤️, ☕, ✨, 🎮" maxlength="4">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="postit-status">Status da conversa:</label>
+            <select id="postit-status">
+              <option value="quero_falar" selected>💬 Quero falar</option>
+              <option value="conversando">⏳ Em pauta / Conversando</option>
+              <option value="preciso_tempo">⏸️ Preciso de mais tempo</option>
+              <option value="resolvido">✨ Já conversamos / Resolvido</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="postit-sensitivity">Tom / Delicadeza:</label>
+            <select id="postit-sensitivity">
+              <option value="leve" selected>🌱 Assunto Leve / Divertido</option>
+              <option value="medio">⚖️ Ponto de Atenção</option>
+              <option value="seria">💬 Conversa Importante / Séria</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Opção de Post-it Guardado (Criptografia) -->
+        <div class="form-group-checkbox">
+          <label class="checkbox-container">
+            <input type="checkbox" id="postit-locked">
+            <span class="checkmark"></span>
+            <strong>Post-it Guardado 🔒</strong> (só revela com a sua senha)
+          </label>
+        </div>
+
+        <div id="group-locked-options" class="locked-container hidden">
+          <div class="form-group">
+            <label for="postit-hint">Dica pública (opcional, aparece antes de abrir):</label>
+            <input type="text" id="postit-hint" placeholder="Ex: Deixei uma surpresa pro fim de semana 👀">
+          </div>
+          <div class="form-group">
+            <label for="postit-password">Senha de proteção:</label>
+            <input type="password" id="postit-password" placeholder="Defina a senha para descriptografar">
+            <small class="text-warning">⚠️ Esta nota é criptografada no navegador com Web Crypto (AES-GCM). Não há como recuperar o texto se a senha for esquecida.</small>
+          </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="postit-size">Tamanho:</label>
-          <select id="postit-size">
-            <option value="small">Pequeno</option>
-            <option value="medium" selected>Médio</option>
-            <option value="large">Grande</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="postit-emoji">Emoji:</label>
-          <input type="text" id="postit-emoji" placeholder="💬, ❤️, ✨" maxlength="4">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>
-          <input type="checkbox" id="postit-locked">
-          Post-it guardado 🔒 (criptografado com senha)
-        </label>
-      </div>
-      <div id="group-password" class="form-group hidden">
-        <label for="postit-password">Senha de desbloqueio:</label>
-        <input type="password" id="postit-password" placeholder="Defina a senha para revelar depois">
-        <small class="text-warning">⚠️ Não há recuperação de senha.</small>
-      </div>
+
       <div class="modal-actions">
-        <button id="btn-save-postit" class="btn btn-primary">Salvar Post-it</button>
         <button id="btn-cancel-postit" class="btn btn-secondary">Cancelar</button>
+        <button id="btn-save-postit" class="btn btn-primary">Salvar Post-it</button>
       </div>
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- Modal de Configurações (Token GitHub & Perfil) -->
+  <div id="modal-config" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Configurações do Mural</h2>
+        <button class="btn-close" id="btn-close-config-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="cfg-author">Quem está usando agora?</label>
+          <select id="cfg-author">
+            <option value="eu">Vitor (Eu)</option>
+            <option value="ela">Ela</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cfg-author-color">Cor da sua etiqueta de identificação:</label>
+          <div class="color-palette" id="author-color-palette">
+            <button type="button" class="color-swatch-author selected" data-author-color="#2563EB" style="background:#2563EB;" title="Azul"></button>
+            <button type="button" class="color-swatch-author" data-author-color="#EC4899" style="background:#EC4899;" title="Rosa"></button>
+            <button type="button" class="color-swatch-author" data-author-color="#8B5CF6" style="background:#8B5CF6;" title="Roxo"></button>
+            <button type="button" class="color-swatch-author" data-author-color="#10B981" style="background:#10B981;" title="Verde"></button>
+          </div>
+        </div>
+        <hr class="divider">
+        <h3>Sincronização com GitHub (GitHub Pages / data.json)</h3>
+        <p class="description-text">
+          Para sincronizar os dois navegadores sem backend próprio, informe um Fine-grained Personal Access Token do GitHub com permissão de leitura e escrita para o repositório.
+        </p>
+        <div class="form-group">
+          <label for="cfg-token">GitHub Personal Access Token:</label>
+          <input type="password" id="cfg-token" placeholder="github_pat_...">
+          <small>Fica seguro apenas no <code>localStorage</code> deste dispositivo.</small>
+        </div>
+        <div class="form-group">
+          <label for="cfg-repo">Repositório alvo (proprietário/nome-repo):</label>
+          <input type="text" id="cfg-repo" placeholder="VitorTozeti/Vitor-mural">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-close-config" class="btn btn-secondary">Fechar</button>
+        <button id="btn-save-config" class="btn btn-primary">Salvar e Conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal / Gaveta de Histórico de Resolvidos -->
+  <div id="modal-history" class="modal hidden">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2>📜 Histórico de Conversas Concluídas</h2>
+        <button class="btn-close" id="btn-close-history-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="description-text">Aqui ficam os assuntos que vocês já conversaram e marcaram como resolvidos. Parabéns pelas conversas! 🎉</p>
+        <div id="history-list" class="history-list">
+          <!-- Itens do histórico -->
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-close-history" class="btn btn-primary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Revelar Post-it Guardado -->
+  <div id="modal-unlock" class="modal hidden">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h2>🔒 Abrir Post-it Guardado</h2>
+        <button class="btn-close" id="btn-close-unlock-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="unlock-hint-text" class="hint-box"></p>
+        <div class="form-group">
+          <label for="unlock-password">Digite a senha definida pelo autor:</label>
+          <input type="password" id="unlock-password" placeholder="Senha do post-it">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-cancel-unlock" class="btn btn-secondary">Cancelar</button>
+        <button id="btn-confirm-unlock" class="btn btn-primary">Desbloquear e Revelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts modulares -->
   <script src="js/crypto.js"></script>
   <script src="js/github.js"></script>
   <script src="js/postit.js"></script>
